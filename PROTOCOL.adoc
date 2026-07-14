@@ -1,0 +1,225 @@
+= Training protocol
+
+This file documents how `skills.yaml`, `practice/`, and `tests/` work
+together, and how `cmd/skillsgen` turns them into `README.md`.
+Any AI agent picking up work in this repo should read this first as it
+defines the contract, not just a convention.
+
+== The pieces
+
+=== Skill registry
+
+`skills.yaml` is the flat skill registry, and Source of truth for what's being tracked:
+
+* a `levels` list (display order)
+* a `categories` map (pure
+display/rollup metadata, see "Skills are flat" below)
+* a `skills` list where every entry has a `slug`, `label`, `level`, `kind`, and optionally
+`categories`.
+** `kind` is `skill` (confidence 0-100, always computed from
+scorecards, never hand-edited) or `milestone` (one-time achievement,
+hand-edited `achieved: true/false`, plus an optional `evidence` field, see
+"From test results to skill confidence to README.md" step 5 for why milestones aren't all held to the same evidentiary standard).
+
+See "Skills are flat" and "scorecard.yaml schema" below.
+
+=== The report generator
+
+`cmd/skillsgen` is a small Go program (`go run ./cmd/skillsgen`) that reads
+`skills.yaml` and every `tests/*/scorecard.yaml` and renders a completion report in `README.md`, the
+repo's actual front page.
+
+`README.md` starts out as the traditional onboarding content (what this repo is, how to use it, quick start). The report generator overwrites it with the live report on its first run, and every run after. That's intentional: the onboarding content only matters once, at setup time.
+
+The report renders natively on GitHub. Every skill or category includes a colored status
+(🔴🟠🟡🟢)
+plus a star at 100 (⭐, for "mastered" skills) and the confidence number next to it. 
+
+Re-run `go run ./cmd/skillsgen` after logging a new attempt or editing a milestone. `README.md` is generated, not maintained by hand. It is meant to be commited to version control alongside `skills.yaml`/scorecards, as this is how progress
+becomes shareable.
+
+The Markdown report's footer links back to the original repository. Update it by hand if the template ever moves.
+
+=== Practice folders
+
+The `practice/` folder allows for self-directed practice projects, maintained by the
+user. The agent does not create or grade content here unless explicitly asked. Use it to benefit from an agent with your learning progress as its context.
+
+=== Test folders
+
+`tests/<test_id>/` holds one folder per assessment the agent has administered or prepared. Please note that a test is not tied 1:1 to a skill. One test is designed to assess one or more skills at once, and its solution can incidentally demonstrate some more.
+
+`<test_id>` is a short
+descriptive slug for the assessment itself (e.g. `spot_the_bug`, `fizzbuzz`), not a skill name.
+
+The test's metadata, including full attempt history, is stored in `tests/<test_id>/scorecard.yaml`. See schema below.
+
+The latest attempt's submission is available at `tests/<test_id>/deliverables/`, where file-based submissions for that test live.
+
+== Skills are flat
+
+Every skill and milestone in `skills.yaml` is independently scoreable. Categories are just meant for display purposes, and they are defined once in `skills.yaml`'s top-level `categories` map, referenced by slug from a skill's own `categories` list. `cmd/skillsgen` computes a category's confidence as the *minimum* across its member skills. A category is never itself a slug a scorecard can reference. `cmd/skillsgen` will complain loudly if one ever tries to (see `warnUnknownSlugs` in `main.go`).
+
+A skill can belong to zero, one, or several categories. `level` is *not* a category, as it is a required field. Any skill must be relatable to a level, so that this level can be shown as achieved when all its skills are green. It drives `README.md`'s top-level sections.
+
+Slugs are still a single flat namespace matched by plain string equality in `cmd/skillsgen/confidence.go`, so generic names (`os`, `time`, `comments`) are still collision-prone even though nesting is gone — categories are
+metadata, not part of the lookup key. Prefer specific slugs (`os_package`,
+`idiomatic_comments`) over bare generic ones.
+
+== Test folder naming
+
+Slug the test's own theme/task, not a skill name: lowercase, underscores for
+spaces. `tests/a_test_identifier/` is the template/example folder — copy its
+shape (`scorecard.yaml`, `deliverables/`, a spec file) when creating a new
+test, then rename it.
+
+== Grading flow
+
+The agent picks the grading mode per test, based on what the skill actually is:
+
+File-based:: for skills that produce artifacts (write functions, write
+tests, work with packages, design services). The agent puts a task spec into
+the test folder (e.g. `todo.adoc`), the user writes their solution into
+`deliverables/`, the agent reviews/runs it and records the result.
+Conversational:: for conceptual/understanding skills (syntax, memory model,
+GC, basic concurrency concepts). The agent quizzes the user live in chat;
+nothing is persisted in the folder except the logged outcome.
+
+The agent states which mode it's using before starting a given test.
+
+=== Skeletons for file-based tests
+
+For Beginner tests, and narrowly-scoped Intermediate tests (a single
+function/algorithm to implement), the agent may provide an interview-style
+skeleton: a function signature to fill in plus a visible test file. This
+keeps the assessment focused on the actual skill instead of setup ceremony.
+
+For tests where the scaffolding itself *is* the skill being assessed
+("can work with packages," "design and implement services from scratch," and
+similar Proficient+ items), the agent does not provide a skeleton — building
+the structure from nothing is the point.
+
+=== Incidental signals
+
+The agent isn't limited to the skills a test was designed for. If a
+conversation or a test attempt shows clear, substantive evidence for a skill
+that wasn't the target (the user explains something correctly, writes
+idiomatic code unprompted, etc.), the agent records it under `demonstrated`
+in the relevant scorecard. A skill merely being mentioned in passing doesn't
+count — this is for cases where the user actually did or explained the
+thing.
+
+If what showed up isn't a tracked skill yet, there's no separate holding
+pen for it — we track them when we track them. The agent adds it as a real
+entry in `skills.yaml` (slug, label, level, and a category if one fits) right
+then, and only then references it from `demonstrated`. An earlier version of
+this protocol had a category-level `notes` list for "seen but not tracked
+yet" — removed, since with flat skills there's no meaningful difference
+between "worth noting" and "worth tracking": both are just adding the skill.
+
+== scorecard.yaml schema
+
+[source,yaml]
+----
+name: <test_id>
+summary: >
+  <what this test is checking for, one or two sentences>
+assesses:
+  - <skill_slug>       # skills this test was designed to evaluate
+demonstrated:
+  - <skill_slug>       # skills incidentally shown, not the test's target
+passed: true | false   # did the *test itself* clear its own bar
+attempts:
+  - date: YYYY-MM-DD
+    score: 0-100
+    confidence: low | medium | high
+    notes: "short note"
+----
+
+`confidence` on an attempt reflects how much the agent trusts that attempt's
+score as a true read of ability — a single easy attempt is `low`; a varied
+attempt covering edge cases is `high`. `passed` on the scorecard means this
+specific test was cleared (an attempt scored >= 80 with confidence >=
+medium) — it's one data point, not skill mastery. Every slug in `assesses`/
+`demonstrated` must be a real skill slug from `skills.yaml`, never a
+category — `cmd/skillsgen` fails validation if it isn't.
+
+== From test results to skill confidence to README.md
+
+There's a hierarchy:
+
+1. An attempt passes *one test*. That's recorded in the test's
+   `scorecard.yaml` and becomes evidence for every skill in that test's
+   `assesses`/`demonstrated` lists.
+2. `cmd/skillsgen` computes each skill's confidence from every
+   `tests/*/scorecard.yaml` that references its slug: for each contributing
+   test it takes the best `score * confidence-tier-weight` among that test's
+   attempts, averages across tests, then scales by a variety factor that
+   only reaches 1.0 once >= 3 distinct tests have contributed — so no single
+   test, however well passed, can carry a skill to full confidence on its
+   own. The exact constants live in `cmd/skillsgen/confidence.go` and are
+   meant to be tuned there if they stop feeling right, rather than
+   reimplemented as prose.
+3. A category's confidence (see "Skills are flat") is the minimum across its
+   member skills' confidence — no partial credit for acing `goroutines`
+   while `select` sits untested.
+4. Nothing in `skills.yaml` needs manual editing to reflect a `skill`
+   reaching 100 — re-running `go run ./cmd/skillsgen` after logging an
+   attempt is enough; `README.md` shows it gold automatically. Every
+   `skill`'s confidence number is shown alongside the test slugs that
+   contributed to it (`cmd/skillsgen/confidence.go`'s `evidenceTests` return
+   value) — the same "don't just trust a number" principle milestones get
+   via their `evidence` field, applied to skills automatically instead of
+   by hand, since it's already fully derivable from the scorecards.
+5. `milestone` entries are the exception: the agent edits `achieved: true`
+   in `skills.yaml` directly once the one-time thing is confirmed to have
+   happened — but "confirmed" means different things for different
+   milestones, and the agent doesn't get to treat them all as equally rigid
+   just because they're all `achieved: true/false`. In practice this split
+   the milestones into two buckets, and one of them turned out to be empty:
++
+--
+* *Externally verifiable* (`contribute_oss`, `contribute_go_language` — the
+  only two milestones left): both leave a public, linkable trail — a merged
+  PR/commit, an accepted Gerrit CL. The agent asks for a URL and actually
+  checks it (fetches it, confirms it's the user's work, confirms it's
+  merged/accepted, not just opened) before setting `achieved: true`, and
+  records that URL in the milestone's `evidence` field. Taking the user's
+  word for something that's this checkable would be a worse standard than
+  what `skill` entries get.
+* *Not externally verifiable*: this bucket used to hold `go_tour` ("Has done
+  Go Tour") and `mentor_others` ("Has mentored others"), and both were
+  removed rather than kept as permanent self-report exceptions. `go_tour`
+  added no signal beyond the Beginner skills it was really just a proxy
+  for (`read_simple_code`, `basic_syntax`, `write_simple_functions`) — once
+  those are evidenced, the tour having happened is redundant, not
+  additional information. `mentor_others` had no plausible verification
+  path and didn't fold into anything else, so it just doesn't get tracked.
+  If a future milestone lands in this bucket again, the same standard
+  applies: the agent still doesn't accept a bare "yes," it asks concrete
+  follow-up questions to sanity-check plausibility, but that's judgment,
+  not verification, and should be described as such rather than implied
+  otherwise.
+--
++
+`README.md` links the `evidence` value when a milestone is achieved and one
+was recorded.
+* Retakes are always allowed and appended to `attempts`, never overwritten —
+  history stays intact.
+* If new evidence contradicts a skill already sitting at 100 (a bad
+  regression), the agent flags it to the user rather than letting the color
+  silently slide back down unremarked.
+
+We deliberately don't assign numeric weights to how much a test "proves" a
+skill (e.g. `assesses: [read_basic_code: 0.1]`) — a weight like that would
+be a guess dressed up as precision, since there's no honest way to justify
+0.1 vs 0.5. The aggregation in step 2 is where nuance belongs instead, and
+it runs on the same score/confidence-tier fields every attempt already
+records — no extra bookkeeping.
+
+== Regenerating README.md
+
+`go run ./cmd/skillsgen` from the repo root (flags: `--skills`, `--tests`,
+`--out`, all defaulted sensibly). Requires `go mod tidy` once, since the
+generator depends on `gopkg.in/yaml.v3` — do this inside the devcontainer,
+which has the Go toolchain; the host may not.

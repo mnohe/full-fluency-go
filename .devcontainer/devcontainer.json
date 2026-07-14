@@ -1,0 +1,62 @@
+{
+  "name": "Full Fluency: Go",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "vscode",
+  "init": true,
+  "runArgs": [
+    "--cap-add=SYS_PTRACE",
+    "--security-opt",
+    "seccomp=unconfined"
+  ],
+  "containerEnv": {
+    "GOTOOLCHAIN": "auto",
+    "GOPATH": "/go"
+  },
+  "features": {},
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Anthropic.claude-code",
+        "OpenAI.chatgpt",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "Google.geminicodeassist",
+        "golang.Go",
+        "ms-vscode.makefile-tools",
+        "ms-vscode.test-adapter-converter",
+        "redhat.vscode-yaml",
+        "github.vscode-github-actions"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "go.useLanguageServer": true,
+        "go.toolsManagement.autoUpdate": true,
+        "go.formatTool": "gofumpt",
+        "go.lintTool": "golangci-lint",
+        "go.lintOnSave": "package",
+        "go.vetOnSave": "package",
+        "go.testFlags": [
+          "-v"
+        ],
+        "gopls": {
+          "ui.semanticTokens": true,
+          "staticcheck": true
+        },
+        "yaml.validate": true
+      }
+    }
+  },
+  "postCreateCommand": "sudo chown -R vscode:vscode /go /home/vscode/.cache && go version && gopls version && dlv version",
+  "mounts": [
+    "source=go-training-gomodcache,target=/go/pkg/mod,type=volume",
+    "source=go-training-gocache,target=/home/vscode/.cache/go-build,type=volume"
+  ]
+}

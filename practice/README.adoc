@@ -1,0 +1,3 @@
+# Practice folder
+
+You can ask an AI agent to help you out or assess programs here, but they will not be counted towards your level, one way or the other.

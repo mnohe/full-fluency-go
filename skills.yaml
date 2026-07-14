@@ -1,0 +1,340 @@
+# Go skill registry
+#
+# See PROTOCOL.adoc.
+#
+# This is the source of truth for skills and milestones.
+# It goes without saying, but do not update by hand!
+# Confidence values are computed on demand by
+# `cmd/skillsgen` from `tests/*/scorecard.yaml`.
+#
+# Every skill is flat and independently scoreable.
+# `categories` are just optional display metadata, and are computed by
+# `cmd/skillsgen` as the *minimum* confidence among their member skills.
+# `level` is its own required field, not a category, since every skill
+# needs exactly one and it drives `README.md`'s top-level sections.
+#
+# The label conventions are borrowed from the CEFR
+# (Common European Framework of Reference for Languages).
+# `kind:skill` such as "Can <verb> ..." and  "Can Do" descriptors used
+# for language-proficiency levels (A1-C2), applied here to Go instead.
+# `kind:milestone` labels read "Has <past participle> ..." (a one-time
+# completed event, not an ongoing ability). Skills grouped under a
+# category (goroutines, net/http, memory model) are kept as bare nouns.
+
+levels: [Beginner, Intermediate, Proficient, Expert]
+
+# This skill list isn't arbitrary -- it's grounded in the resources below.
+# Each reference tags the `topics` it covers rather than being pinned to one
+# skill (most cover several at once, and forcing a single citation per skill
+# would overstate the precision). Where a topic has no single canonical
+# source (e.g. "design large-scale systems", "debug complex issues"), it's
+# left uncited rather than force-fit to something that doesn't really cover
+# it.
+references:
+  - name: A Tour of Go
+    url: https://go.dev/tour/
+    topics: [Beginner]
+  - name: Effective Go
+    url: https://go.dev/doc/effective_go
+    topics:
+      - Beginner
+      - Package use
+      - Concurrency
+      - Idiomatic Go
+      - Error handling
+  - name: Share Memory By Communicating
+    authors: [Andrew Gerrand]
+    url: https://go.dev/blog/codelab-share
+    topics: [Concurrency]
+  - name: "Go Concurrency Patterns: Pipelines and cancellation"
+    authors: [Sameer Ajmani]
+    url: https://go.dev/blog/pipelines
+    topics: [Concurrency]
+  - name: Concurrency in Go
+    authors: [Katherine Cox-Buday]
+    url: https://www.oreilly.com/library/view/concurrency-in-go/9781491941294/
+    topics: [Concurrency]
+  - name: How to Write Go Code
+    url: https://go.dev/doc/code
+    topics: [Package use]
+  - name: Go Code Review Comments
+    url: https://go.dev/wiki/CodeReviewComments
+    topics: [Idiomatic Go]
+  - name: Go Proverbs
+    authors: [Rob Pike]
+    url: https://go-proverbs.github.io/
+    topics: [Idiomatic Go]
+  - name: Error handling and Go
+    authors: [Andrew Gerrand]
+    url: https://go.dev/blog/error-handling-and-go
+    topics: [Error handling]
+  - name: Working with Errors in Go 1.13
+    authors: [Damien Neil, Jonathan Amsterdam]
+    url: https://go.dev/blog/go1.13-errors
+    topics: [Error handling]
+  - name: "Go by Example: Testing"
+    url: https://gobyexample.com/testing
+    topics: [Testing]
+  - name: "Go Wiki: TableDrivenTests"
+    url: https://go.dev/wiki/TableDrivenTests
+    topics: [Testing]
+  - name: Profiling Go Programs
+    url: https://go.dev/blog/pprof
+    topics: [Performance]
+  - name: Introducing the Go Race Detector
+    url: https://go.dev/blog/race-detector
+    topics: [Debugging, Concurrency]
+  - name: The Go Memory Model
+    url: https://go.dev/ref/mem
+    topics: [Internals, Concurrency]
+  - name: "Go Data Structures: Interfaces"
+    authors: [Russ Cox]
+    url: https://research.swtch.com/interfaces
+    topics: [Internals]
+  - name: Scalable Go Scheduler Design Doc
+    authors: [Dmitry Vyukov]
+    url: https://go.dev/s/go11sched
+    topics: [Internals, Concurrency]
+  - name: "C? Go? Cgo!"
+    url: https://go.dev/blog/cgo
+    topics: [Internals]
+  - name: The Go Programming Language
+    authors: [Alan Donovan, Brian Kernighan]
+    url: https://www.gopl.io/
+    topics: [The language itself]
+  - name: The Go Programming Language Specification
+    url: https://go.dev/ref/spec
+    topics: [The language itself]
+
+categories:
+  concurrency_basics:
+    label: Concurrency basics
+  stdlib_fluency:
+    label: Standard library fluency
+  advanced_concurrency:
+    label: Advanced concurrency patterns
+  idiomatic_go:
+    label: Idiomatic Go
+  go_internals:
+    label: Go internals
+  deep_go_internals:
+    label: Go internals (deep)
+
+skills:
+  # Beginner
+  - slug: read_simple_code
+    label: Can read simple code
+    level: Beginner
+    kind: skill
+  - slug: basic_syntax
+    label: Can understand basic syntax
+    level: Beginner
+    kind: skill
+  - slug: write_simple_functions
+    label: Can write simple functions
+    level: Beginner
+    kind: skill
+
+  # Intermediate
+  - slug: write_complete_programs
+    label: Can write complete programs
+    level: Intermediate
+    kind: skill
+  - slug: goroutines
+    label: goroutines
+    level: Intermediate
+    kind: skill
+    categories: [concurrency_basics]
+  - slug: channels
+    label: channels
+    level: Intermediate
+    kind: skill
+    categories: [concurrency_basics]
+  - slug: select_statement
+    label: select
+    level: Intermediate
+    kind: skill
+    categories: [concurrency_basics]
+  - slug: sync_primitives
+    label: sync primitives (Mutex, WaitGroup, Once)
+    level: Intermediate
+    kind: skill
+    categories: [concurrency_basics]
+  - slug: choosing_concurrency_primitives
+    label: Can choose the right concurrency primitive for the job
+    level: Intermediate
+    kind: skill
+    categories: [concurrency_basics]
+  - slug: use_interfaces
+    label: Can use interfaces
+    level: Intermediate
+    kind: skill
+  - slug: write_tests
+    label: Can write tests
+    level: Intermediate
+    kind: skill
+  - slug: work_with_packages
+    label: Can work with packages
+    level: Intermediate
+    kind: skill
+  - slug: net_http
+    label: net/http
+    level: Intermediate
+    kind: skill
+    categories: [stdlib_fluency]
+  - slug: encoding_json
+    label: encoding/json
+    level: Intermediate
+    kind: skill
+    categories: [stdlib_fluency]
+  - slug: os_package
+    label: os
+    level: Intermediate
+    kind: skill
+    categories: [stdlib_fluency]
+  - slug: io_package
+    label: io
+    level: Intermediate
+    kind: skill
+    categories: [stdlib_fluency]
+  - slug: time_package
+    label: time
+    level: Intermediate
+    kind: skill
+    categories: [stdlib_fluency]
+  - slug: handle_errors
+    label: Can handle errors properly
+    level: Intermediate
+    kind: skill
+
+  # Proficient
+  - slug: design_services
+    label: Can design and implement services from scratch
+    level: Proficient
+    kind: skill
+  - slug: worker_pools
+    label: worker pools
+    level: Proficient
+    kind: skill
+    categories: [advanced_concurrency]
+  - slug: fan_in_fan_out
+    label: fan-in/fan-out
+    level: Proficient
+    kind: skill
+    categories: [advanced_concurrency]
+  - slug: pipelines
+    label: pipelines
+    level: Proficient
+    kind: skill
+    categories: [advanced_concurrency]
+  - slug: cancellation_propagation
+    label: cancellation propagation (context, errgroup)
+    level: Proficient
+    kind: skill
+    categories: [advanced_concurrency]
+  - slug: goroutine_leak_avoidance
+    label: avoiding goroutine leaks
+    level: Proficient
+    kind: skill
+    categories: [advanced_concurrency]
+  - slug: rate_limiting
+    label: rate limiting
+    level: Proficient
+    kind: skill
+    categories: [advanced_concurrency]
+  - slug: idiomatic_comments
+    label: Can write clear comments
+    level: Proficient
+    kind: skill
+    categories: [idiomatic_go]
+  - slug: naming_conventions
+    label: Can follow Go naming conventions
+    level: Proficient
+    kind: skill
+    categories: [idiomatic_go]
+  - slug: idiomatic_error_handling
+    label: Can handle errors idiomatically (wrapping, sentinel errors)
+    level: Proficient
+    kind: skill
+    categories: [idiomatic_go]
+  - slug: avoids_overabstraction
+    label: Can avoid unnecessary abstraction/interfaces
+    level: Proficient
+    kind: skill
+    categories: [idiomatic_go]
+  - slug: comprehensive_testing
+    label: Can write comprehensive test suites (table-driven tests, mocks/fakes, httptest, benchmarks)
+    level: Proficient
+    kind: skill
+  - slug: code_review
+    label: Can give useful code review feedback on others' Go code
+    level: Proficient
+    kind: skill
+  - slug: optimize_performance
+    label: Can optimize performance
+    level: Proficient
+    kind: skill
+  - slug: debug_complex_issues
+    label: Can debug complex issues
+    level: Proficient
+    kind: skill
+  - slug: contribute_oss
+    label: Has contributed to open source projects
+    level: Proficient
+    kind: milestone
+    achieved: false
+  - slug: go_internals_memory_model
+    label: memory model
+    level: Proficient
+    kind: skill
+    categories: [go_internals]
+  - slug: go_internals_gc
+    label: GC
+    level: Proficient
+    kind: skill
+    categories: [go_internals]
+  - slug: escape_analysis
+    label: escape analysis
+    level: Proficient
+    kind: skill
+    categories: [go_internals]
+  - slug: interface_internals
+    label: interface internals (itab/eface)
+    level: Proficient
+    kind: skill
+    categories: [go_internals]
+
+  # Expert
+  - slug: design_large_scale_systems
+    label: Can design large-scale systems
+    level: Expert
+    kind: skill
+  - slug: scheduler_internals
+    label: scheduler (GMP model, work stealing)
+    level: Expert
+    kind: skill
+    categories: [deep_go_internals]
+  - slug: compiler_ssa
+    label: compiler/SSA basics
+    level: Expert
+    kind: skill
+    categories: [deep_go_internals]
+  - slug: unsafe_cgo
+    label: unsafe and cgo boundaries
+    level: Expert
+    kind: skill
+    categories: [deep_go_internals]
+  - slug: memory_ordering
+    label: memory ordering / sync/atomic guarantees
+    level: Expert
+    kind: skill
+    categories: [deep_go_internals]
+  - slug: high_performance_concurrent_code
+    label: Can write high-performance, concurrent code
+    level: Expert
+    kind: skill
+  - slug: contribute_go_language
+    label: Has contributed to the Go language itself
+    level: Expert
+    kind: milestone
+    achieved: false
