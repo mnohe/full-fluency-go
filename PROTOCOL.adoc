@@ -65,7 +65,7 @@ A skill can belong to zero, one, or several categories. `level` is *not* a categ
 
 == Test folder naming
 
-Slug the test's own task or topic, not a skill name: lowercase, underscores for spaces. `tests/a_test_identifier/` is the template/example folder. You can copy its shape (`metadata.yaml`, `scorecard.yaml`, `deliverables/`, a spec file) when creating a new test, then rename it.
+Slug the test's own task or topic, not a skill name: lowercase, underscores for spaces. There's no checked-in template folder: `tests/` doesn't exist until the first test is created, and the agent writes each new `tests/<test_id>/` from the schemas below.
 
 == Grading flow
 

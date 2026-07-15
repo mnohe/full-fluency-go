@@ -4,7 +4,7 @@ Track your Go proficiency from Beginner to Expert, guided and assessed by an AI 
 
 This repository is meant to be used as a template for your own Go learning path. It contains a skill registry (`skills.yaml`), a protocol for how an agent administers and scores tests (`PROTOCOL.adoc`), and a report generator (`cmd/reportgen`) that renders your current standing into this repo's own `README.md`.
 
-This page you're reading now is the *onboarding* version. The first time you run the report generator, it overwrites this file with your live report. Nothing is lost: everything below only matters once, at setup time, and `PROTOCOL.adoc` remains for the actual rules. In any casem you can always read this document at [its original location](https://github.com/mnohe/full-fluency-go).
+This page you're reading now is the *onboarding* version. The first time you run the report generator, it overwrites this file with your live report. Nothing is lost: everything below only matters once, at setup time, and `PROTOCOL.adoc` remains for the actual rules. In any case, you can always read this document at [its original location](https://github.com/mnohe/full-fluency-go).
 
 ## Fork or use as a template?
 
