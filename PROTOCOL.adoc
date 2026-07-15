@@ -26,6 +26,8 @@ Every skill is independently scoreable, computed from `tests/*/` on demand. Noth
 
 The report renders natively on GitHub. Every skill's row shows a status icon (⚪🔴🟠🟡🟢⭐) reflecting its current position on the ladder (see "From test results to skill state" below), and links to the tests that produced it.
 
+The report's top carries a single [shields.io](https://shields.io) badge, above and separate from the per-skill icons: it names the highest level from `skills.yaml`'s `levels` list that's fully cleared -- every skill in that level at green or better -- cascading from the first level, so a later level never counts while an earlier one hasn't cleared too. Each level has its own badge color (orange, yellow, green, blue, in level order); until any level is fully cleared, the badge shows the first level in grey. `Master` is a separate rank above the last level, not one of `skills.yaml`'s own levels: it's earned only once every skill in every level has reached the mastered rung, and renders in black rather than a level color. The exact rule lives in `computeBadge` in `cmd/reportgen/render.go`.
+
 `README.md` is generated, not maintained by hand. Re-run `go run ./cmd/reportgen` after logging a new attempt. Commit it to version control alongside `skills.yaml` and `tests/`.
 
 The report's footer links back to the original repository. Update it by hand if the template ever moves.

@@ -72,9 +72,123 @@ type TestIndexEntry struct {
 
 // reportData is the complete template input for the single generated output.
 type reportData struct {
+	Badge      BadgeView
 	Levels     []LevelView
 	References []ReferenceView
 	TestIndex  []TestIndexEntry
+}
+
+// BadgeView is the report's single top-of-page achievement badge: the
+// highest skills.yaml level fully cleared (every one of its skills at
+// green or better) cascading from the first level, so a later level only
+// counts once every earlier one does too. Master isn't one of skills.yaml's
+// own levels; it's a separate rank above the last of them, earned only once
+// every skill in every level has reached the mastered rung (see
+// stateMaster in confidence.go).
+type BadgeView struct {
+	Level string
+	Alt   string
+	URL   string
+}
+
+// levelBadgeColors assigns each skills.yaml level a fixed shields.io color,
+// by position in the levels list. An achieved level beyond this palette's
+// length (skills.yaml grew a fifth non-Master level) falls back to the last
+// color rather than erroring, since the badge is cosmetic.
+var levelBadgeColors = []string{colorOrange, colorYellow, colorGreen, "blue"}
+
+// masterBadgeColor is black, echoing a martial-arts black belt: Master is
+// the rank above every colored level, not just another rung in their
+// sequence.
+const masterBadgeColor = "black"
+
+// computeBadge walks the already-rendered level views -- no need to
+// recompute skill state, buildLevelViews already resolved every skill's
+// Color -- to find the badge this report should show.
+func computeBadge(levels []LevelView) BadgeView {
+	achievedIdx := -1
+	totalSkills := 0
+	allMastered := true
+
+	for i, level := range levels {
+		complete := len(level.Skills) > 0
+		for _, skill := range level.Skills {
+			totalSkills++
+			if skill.Color != colorGreen && skill.Color != colorGold {
+				complete = false
+			}
+			if skill.Color != colorGold {
+				allMastered = false
+			}
+		}
+		if complete && achievedIdx == i-1 {
+			achievedIdx = i
+		}
+	}
+	if totalSkills == 0 {
+		allMastered = false
+	}
+
+	label := "FF:GO"
+	if allMastered {
+		return newBadgeView(label, "Master", masterBadgeColor)
+	}
+	if achievedIdx == -1 {
+		name := "Beginner"
+		if len(levels) > 0 {
+			name = levels[0].Name
+		}
+		return newBadgeView(label, name, colorGrey)
+	}
+
+	color := levelBadgeColors[len(levelBadgeColors)-1]
+	if achievedIdx < len(levelBadgeColors) {
+		color = levelBadgeColors[achievedIdx]
+	}
+	return newBadgeView(label, levels[achievedIdx].Name, color)
+}
+
+// newBadgeView builds a badge's Markdown alt text and shields.io URL
+// together so the two can never drift apart.
+func newBadgeView(label, level, color string) BadgeView {
+	return BadgeView{
+		Level: level,
+		Alt:   fmt.Sprintf("%s level: %s", label, level),
+		URL:   shieldsBadgeURL(label, level, color),
+	}
+}
+
+// shieldsBadgeURL builds a static shields.io badge URL from a label,
+// message, and color, e.g.
+// https://img.shields.io/badge/FF%3AGO-Beginner-orange?style=for-the-badge.
+func shieldsBadgeURL(label, message, color string) string {
+	return fmt.Sprintf("https://img.shields.io/badge/%s-%s-%s?style=for-the-badge",
+		shieldsEscape(label), shieldsEscape(message), shieldsEscape(color))
+}
+
+// shieldsEscape encodes one shields.io badge path segment, following
+// shields' own convention (-- for a literal -, __ for a literal _, _ for a
+// space) and percent-encoding anything else that isn't safe unescaped in a
+// URL path segment.
+func shieldsEscape(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r == '-':
+			b.WriteString("--")
+		case r == '_':
+			b.WriteString("__")
+		case r == ' ':
+			b.WriteByte('_')
+		case (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+		default:
+			for _, c := range []byte(string(r)) {
+				fmt.Fprintf(&b, "%%%02X", c)
+			}
+		}
+	}
+	return b.String()
 }
 
 // colorEmoji maps status colors onto GitHub-rendered emoji, the only color
@@ -82,13 +196,13 @@ type reportData struct {
 func colorEmoji(color string) string {
 	switch color {
 	case colorRed:
-		return "\U0001F534"
+		return "\U0001F534" // 🔴
 	case colorOrange:
-		return "\U0001F7E0"
+		return "\U0001F7E0" // 🟠
 	case colorYellow:
-		return "\U0001F7E1"
+		return "\U0001F7E1" // 🟡
 	case colorGreen:
-		return "\U0001F7E2"
+		return "\U0001F7E2" // 🟢
 	case colorGold:
 		return "⭐"
 	default:
@@ -192,6 +306,7 @@ func renderMarkdown(outPath string, data reportData) error {
 	tmpl, err := template.New("report.md.tmpl").Funcs(template.FuncMap{
 		"cell":     markdownTableCell,
 		"link":     markdownLink,
+		"imageAlt": markdownImageAlt,
 		"evidence": markdownEvidenceCell,
 	}).ParseFS(templateFS, "report.md.tmpl")
 	if err != nil {
@@ -293,6 +408,11 @@ func markdownLink(text, rawURL string) string {
 		return markdownTableCell(text)
 	}
 	return "[" + markdownLinkText(text) + "](" + markdownLinkDestination(rawURL) + ")"
+}
+
+// markdownImageAlt escapes text used inside Markdown image alt brackets.
+func markdownImageAlt(s string) string {
+	return markdownLinkText(s)
 }
 
 // markdownTableCell escapes dynamic text for GitHub-flavored Markdown tables.

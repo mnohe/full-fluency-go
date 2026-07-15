@@ -38,9 +38,101 @@ func TestBuildTestIndexNumbersOnlyAttemptedTests(t *testing.T) {
 	}
 }
 
+func skillView(color string) SkillView {
+	return SkillView{HasData: color != colorGrey, Color: color}
+}
+
+func TestComputeBadgeNoLevelClearedYetShowsFirstLevelGrey(t *testing.T) {
+	levels := []LevelView{
+		{Name: "Beginner", Skills: []SkillView{skillView(colorYellow), skillView(colorGreen)}},
+		{Name: "Intermediate", Skills: []SkillView{skillView(colorGreen)}},
+	}
+	got := computeBadge(levels)
+	if got.Level != "Beginner" {
+		t.Fatalf("Level = %q, want %q", got.Level, "Beginner")
+	}
+	if !strings.Contains(got.URL, "-Beginner-grey?") {
+		t.Fatalf("URL = %q, want grey Beginner badge", got.URL)
+	}
+}
+
+func TestComputeBadgeFirstLevelClearedIsOrange(t *testing.T) {
+	levels := []LevelView{
+		{Name: "Beginner", Skills: []SkillView{skillView(colorGreen), skillView(colorGold)}},
+		{Name: "Intermediate", Skills: []SkillView{skillView(colorYellow)}},
+	}
+	got := computeBadge(levels)
+	if got.Level != "Beginner" || !strings.Contains(got.URL, "-Beginner-orange?") {
+		t.Fatalf("computeBadge() = %+v, want cleared Beginner/orange", got)
+	}
+}
+
+func TestComputeBadgeDoesNotSkipAnUnclearedEarlierLevel(t *testing.T) {
+	levels := []LevelView{
+		{Name: "Beginner", Skills: []SkillView{skillView(colorRed)}},
+		{Name: "Intermediate", Skills: []SkillView{skillView(colorGreen)}},
+	}
+	got := computeBadge(levels)
+	if got.Level != "Beginner" || !strings.Contains(got.URL, "grey") {
+		t.Fatalf("computeBadge() = %+v, want Beginner/grey even though Intermediate alone is all green", got)
+	}
+}
+
+func TestComputeBadgeAllMasteredIsBlackMaster(t *testing.T) {
+	levels := []LevelView{
+		{Name: "Beginner", Skills: []SkillView{skillView(colorGold)}},
+		{Name: "Expert", Skills: []SkillView{skillView(colorGold)}},
+	}
+	got := computeBadge(levels)
+	if got.Level != "Master" || !strings.Contains(got.URL, "-Master-black?") {
+		t.Fatalf("computeBadge() = %+v, want Master/black", got)
+	}
+}
+
+func TestComputeBadgeNoSkillsAtAllIsGrey(t *testing.T) {
+	got := computeBadge(nil)
+	if got.Level != "Beginner" || !strings.Contains(got.URL, "grey") {
+		t.Fatalf("computeBadge(nil) = %+v, want Beginner/grey", got)
+	}
+}
+
+func TestShieldsBadgeURLEscapesReservedCharacters(t *testing.T) {
+	tests := []struct {
+		name    string
+		label   string
+		message string
+		color   string
+		want    string
+	}{
+		{
+			name:    "ascii reserved punctuation",
+			label:   "FF:GO",
+			message: "Beginner",
+			color:   "orange",
+			want:    "https://img.shields.io/badge/FF%3AGO-Beginner-orange?style=for-the-badge",
+		},
+		{
+			name:    "shields conventions and utf8",
+			label:   "FF_GO",
+			message: "Début - A_B",
+			color:   "blue",
+			want:    "https://img.shields.io/badge/FF__GO-D%C3%A9but_--_A__B-blue?style=for-the-badge",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shieldsBadgeURL(tt.label, tt.message, tt.color); got != tt.want {
+				t.Fatalf("shieldsBadgeURL() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRenderMarkdownEscapesDynamicContent(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "README.md")
 	data := reportData{
+		Badge: BadgeView{Alt: "FF:[GO] level: Beginner", URL: "https://img.shields.io/badge/FF%3AGO-Beginner-grey?style=for-the-badge"},
 		Levels: []LevelView{{
 			Name: "Beginner|Level",
 			Skills: []SkillView{{
@@ -69,6 +161,7 @@ func TestRenderMarkdownEscapesDynamicContent(t *testing.T) {
 	}
 	got := string(b)
 	for _, want := range []string{
+		"![FF:\\[GO\\] level: Beginner](https://img.shields.io/badge/FF%3AGO-Beginner-grey?style=for-the-badge)",
 		"## Beginner\\|Level",
 		"| 🔴 | Can read \\| explain | Core\\|Skills | red | [1](tests/spot_bug/) |",
 		"1. [spot_bug](tests/spot_bug/)",
