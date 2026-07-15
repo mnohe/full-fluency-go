@@ -55,8 +55,10 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	testNumbers, testIndex := buildTestIndex(cards)
+	levels := buildLevelViews(sf, cards, testNumbers)
 	report := reportData{
-		Levels:     buildLevelViews(sf, cards, testNumbers),
+		Badge:      computeBadge(levels),
+		Levels:     levels,
 		References: buildReferenceViews(sf.References),
 		TestIndex:  testIndex,
 	}

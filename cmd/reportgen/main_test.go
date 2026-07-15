@@ -55,6 +55,13 @@ attempts: []
 	if _, err := os.Stat(out); err != nil {
 		t.Fatalf("expected Markdown output: %v", err)
 	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "![FF:GO level: Beginner](https://img.shields.io/badge/FF%3AGO-Beginner-grey?style=for-the-badge)"; !strings.Contains(string(b), want) {
+		t.Fatalf("generated report missing badge %q:\n%s", want, string(b))
+	}
 	if _, err := os.Stat(filepath.Join(dir, "skills.html")); !os.IsNotExist(err) {
 		t.Fatalf("skills.html exists or stat failed unexpectedly: %v", err)
 	}
