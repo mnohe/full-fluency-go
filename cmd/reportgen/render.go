@@ -23,45 +23,37 @@ const (
 	colorGold   = "gold"
 )
 
-// SkillView is the template-facing form of a registry skill. It carries both
-// source identity and computed display state so the template can stay mostly
-// declarative.
+// EvidenceLink is one contributing test, numbered against the report's
+// global test index so the Evidence column can show a compact "[1] [2]"
+// instead of repeating test IDs inline in every row.
+type EvidenceLink struct {
+	Number int
+	TestID string
+}
+
+// SkillView is the template-facing form of a registry skill: every skill is
+// independently scoreable, so this carries no notion of category rollup or
+// milestone state -- categories are a plain display column, not a grouping.
 type SkillView struct {
-	Slug          string
-	Label         string
-	Kind          string
-	Confidence    int
-	HasData       bool
-	Achieved      bool
-	Evidence      string
-	EvidenceTests []string
-	StatusText    string
-	Color         string
-	Emoji         string
+	Slug           string
+	Label          string
+	StatusText     string
+	HasData        bool
+	CategoryLabels []string
+	Evidence       []EvidenceLink
+	Color          string
+	Emoji          string
 }
 
-// EvidenceTestsText joins contributing test IDs for compact Markdown display.
-func (v SkillView) EvidenceTestsText() string {
-	return strings.Join(v.EvidenceTests, ", ")
-}
-
-// CategoryView is a category plus the minimum confidence across its member
-// skills. Untested members count as zero for the category gate.
-type CategoryView struct {
-	Slug       string
-	Label      string
-	Confidence int
-	HasData    bool
-	Color      string
-	Emoji      string
-	Skills     []SkillView
+// CategoriesText joins CategoryLabels for the report's Category column.
+func (v SkillView) CategoriesText() string {
+	return strings.Join(v.CategoryLabels, ", ")
 }
 
 // LevelView is one top-level report section in skills.yaml level order.
 type LevelView struct {
-	Name       string
-	Skills     []SkillView
-	Categories []CategoryView
+	Name   string
+	Skills []SkillView
 }
 
 // ReferenceView is one bibliography row, already normalized for display.
@@ -71,10 +63,18 @@ type ReferenceView struct {
 	URL         string
 }
 
+// TestIndexEntry is one row of the report's Tests appendix -- the number the
+// Evidence column links to, resolved to the actual test.
+type TestIndexEntry struct {
+	Number int
+	TestID string
+}
+
 // reportData is the complete template input for the single generated output.
 type reportData struct {
 	Levels     []LevelView
 	References []ReferenceView
+	TestIndex  []TestIndexEntry
 }
 
 // colorEmoji maps status colors onto GitHub-rendered emoji, the only color
@@ -96,108 +96,80 @@ func colorEmoji(color string) string {
 	}
 }
 
-// buildSkillView computes the display state for one skill. Milestones skip the
-// confidence pipeline because their state is hand-edited, not score-derived.
-func buildSkillView(skill Skill, cards []Scorecard) SkillView {
+// stateStatusText is the report's display word for a skill's ladder state.
+func stateStatusText(hasData bool, state string) string {
+	if !hasData {
+		return "untested"
+	}
+	if state == stateMaster {
+		return "mastered"
+	}
+	return state // "red"/"orange"/"yellow"/"green" already read fine as words
+}
+
+// buildTestIndex numbers every test that has contributed at least one
+// attempt, in the order loadScorecards already returns them (lexical by
+// directory name), so the Evidence column and the Tests appendix agree.
+func buildTestIndex(cards []Scorecard) (numbers map[string]int, index []TestIndexEntry) {
+	numbers = map[string]int{}
+	for _, card := range cards {
+		if len(card.Attempts) == 0 {
+			continue
+		}
+		n := len(numbers) + 1
+		numbers[card.Name] = n
+		index = append(index, TestIndexEntry{Number: n, TestID: card.Name})
+	}
+	return numbers, index
+}
+
+// buildSkillView computes one skill's display state, including its
+// evidence trail resolved against the report's global test numbering.
+func buildSkillView(skill Skill, cards []Scorecard, categories map[string]Category, testNumbers map[string]int) SkillView {
+	state, hasData, evidenceTests := skillLadder(skill.Slug, cards)
+
 	view := SkillView{
-		Slug:     skill.Slug,
-		Label:    skill.Label,
-		Kind:     skill.Kind,
-		Achieved: skill.Achieved,
-		Evidence: skill.Evidence,
+		Slug:    skill.Slug,
+		Label:   skill.Label,
+		HasData: hasData,
 	}
-	if skill.Kind == kindSkill {
-		view.Confidence, view.HasData, view.EvidenceTests = skillConfidence(skill.Slug, cards)
+	for _, categorySlug := range skill.Categories {
+		view.CategoryLabels = append(view.CategoryLabels, categories[categorySlug].Label)
 	}
-	view.StatusText, view.Color = statusBucket(view.Kind, view.Achieved, view.HasData, view.Confidence)
+	for _, testID := range evidenceTests {
+		n, numbered := testNumbers[testID]
+		if !numbered {
+			continue // defensive: skillLadder and buildTestIndex agree on what counts as evidence, but never silently render a fabricated [0] link if that ever drifts
+		}
+		view.Evidence = append(view.Evidence, EvidenceLink{Number: n, TestID: testID})
+	}
+
+	if hasData {
+		view.Color = state
+	} else {
+		view.Color = colorGrey
+	}
+	view.StatusText = stateStatusText(hasData, state)
 	view.Emoji = colorEmoji(view.Color)
 	return view
 }
 
-// buildLevelViews preserves the human-authored ordering from skills.yaml while
-// materializing category rollups for the report.
-func buildLevelViews(sf SkillsFile, cards []Scorecard) []LevelView {
+// buildLevelViews preserves the human-authored ordering from skills.yaml.
+// There is no category grouping here: every skill is its own row regardless
+// of which categories (if any) it carries.
+func buildLevelViews(sf SkillsFile, cards []Scorecard, testNumbers map[string]int) []LevelView {
 	levels := make([]LevelView, 0, len(sf.Levels))
 	for _, levelName := range sf.Levels {
 		level := LevelView{Name: levelName}
-		categoryOrder := []string{}
-		categoryViews := map[string]*CategoryView{}
-
 		for _, skill := range sf.Skills {
 			if skill.Level != levelName {
 				continue
 			}
-			skillView := buildSkillView(skill, cards)
-			if len(skill.Categories) == 0 {
-				level.Skills = append(level.Skills, skillView)
-				continue
-			}
-			for _, categorySlug := range skill.Categories {
-				category, ok := categoryViews[categorySlug]
-				if !ok {
-					meta := sf.Categories[categorySlug]
-					category = &CategoryView{Slug: categorySlug, Label: meta.Label}
-					categoryViews[categorySlug] = category
-					categoryOrder = append(categoryOrder, categorySlug)
-				}
-				category.Skills = append(category.Skills, skillView)
-			}
-		}
-
-		for _, categorySlug := range categoryOrder {
-			category := categoryViews[categorySlug]
-			category.Confidence, category.HasData = categoryConfidence(category.Skills)
-			_, category.Color = statusBucket(kindSkill, false, category.HasData, category.Confidence)
-			category.Emoji = colorEmoji(category.Color)
-			level.Categories = append(level.Categories, *category)
+			level.Skills = append(level.Skills, buildSkillView(skill, cards, sf.Categories, testNumbers))
 		}
 		levels = append(levels, level)
 	}
 	return levels
-}
-
-// categoryConfidence applies the protocol's "no partial credit" category rule:
-// the category confidence is the minimum effective confidence of its members.
-func categoryConfidence(skills []SkillView) (confidence int, hasData bool) {
-	haveCandidate := false
-	for _, skill := range skills {
-		effective := 0
-		if skill.HasData {
-			hasData = true
-			effective = skill.Confidence
-		}
-		if !haveCandidate || effective < confidence {
-			confidence = effective
-			haveCandidate = true
-		}
-	}
-	return confidence, hasData
-}
-
-// statusBucket maps a skill/category/milestone state onto the report's fixed
-// status language and color band.
-func statusBucket(kind string, achieved, hasData bool, confidence int) (statusText, color string) {
-	if kind == kindMilestone {
-		if achieved {
-			return "achieved", colorGreen
-		}
-		return "not yet", colorGrey
-	}
-	if !hasData {
-		return "untested", colorGrey
-	}
-	switch {
-	case confidence >= 100:
-		return "mastered", colorGold
-	case confidence >= 90:
-		return "green", colorGreen
-	case confidence >= 66:
-		return "yellow", colorYellow
-	case confidence >= 33:
-		return "orange", colorOrange
-	default:
-		return "red", colorRed
-	}
 }
 
 // buildReferenceViews joins author lists once so the template does not need to
@@ -218,10 +190,9 @@ func buildReferenceViews(refs []Reference) []ReferenceView {
 // template error therefore cannot leave README.md half-written.
 func renderMarkdown(outPath string, data reportData) error {
 	tmpl, err := template.New("report.md.tmpl").Funcs(template.FuncMap{
-		"cell":           markdownTableCell,
-		"categoryStatus": markdownCategoryStatus,
-		"description":    markdownSkillDescription,
-		"link":           markdownLink,
+		"cell":     markdownTableCell,
+		"link":     markdownLink,
+		"evidence": markdownEvidenceCell,
 	}).ParseFS(templateFS, "report.md.tmpl")
 	if err != nil {
 		return fmt.Errorf("parse Markdown template: %w", err)
@@ -300,31 +271,19 @@ func replaceFile(tmpPath, finalPath string) error {
 	return os.Rename(tmpPath, finalPath)
 }
 
-// markdownCategoryStatus is the report wording for category rollups.
-func markdownCategoryStatus(category CategoryView) string {
-	if !category.HasData {
-		return "untested"
+// markdownEvidenceCell renders a skill's evidence trail as compact linked
+// numbers, e.g. "[1](tests/spot_the_bug/) [2](tests/read_and_explain/)" --
+// concise in the row, fully traceable via the Tests appendix and the link
+// destination itself.
+func markdownEvidenceCell(skill SkillView) string {
+	if len(skill.Evidence) == 0 {
+		return ""
 	}
-	return fmt.Sprintf("%d", category.Confidence)
-}
-
-// markdownSkillDescription is the report wording for skills and milestones,
-// including the evidence trail that prevents scores from becoming context-free.
-func markdownSkillDescription(skill SkillView) string {
-	if skill.Kind == kindMilestone {
-		if skill.Achieved && skill.Evidence != "" {
-			return markdownTableCell(skill.StatusText) + " (" + markdownLink("evidence", skill.Evidence) + ")"
-		}
-		return markdownTableCell(skill.StatusText)
+	parts := make([]string, len(skill.Evidence))
+	for i, e := range skill.Evidence {
+		parts[i] = fmt.Sprintf("[%d](tests/%s/)", e.Number, e.TestID)
 	}
-	if !skill.HasData {
-		return "untested"
-	}
-	description := fmt.Sprintf("%d", skill.Confidence)
-	if tests := skill.EvidenceTestsText(); tests != "" {
-		description += " (" + markdownTableCell(tests) + ")"
-	}
-	return description
+	return strings.Join(parts, " ")
 }
 
 // markdownLink renders a Markdown link after escaping the link text and the

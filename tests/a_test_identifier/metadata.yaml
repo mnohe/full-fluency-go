@@ -1,0 +1,9 @@
+# Read-only test specification. Do not edit once the test has attempts
+# recorded against it -- design a new test instead of changing what this one
+# measures. See PROTOCOL.adoc.
+name: a_test_identifier
+summary: >
+  Identify code smells and fix them.
+assesses:
+  - fix_basic_code
+  - write_simple_functions

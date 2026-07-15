@@ -1,4 +1,4 @@
-// Command skillsgen renders the repository's generated Markdown progress
+// Command reportgen renders the repository's generated Markdown progress
 // report from skills.yaml and tests/*/scorecard.yaml. See PROTOCOL.adoc for
 // the data contract this command enforces.
 package main
@@ -54,9 +54,11 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 
+	testNumbers, testIndex := buildTestIndex(cards)
 	report := reportData{
-		Levels:     buildLevelViews(sf, cards),
+		Levels:     buildLevelViews(sf, cards, testNumbers),
 		References: buildReferenceViews(sf.References),
+		TestIndex:  testIndex,
 	}
 	if err := renderMarkdown(cfg.outPath, report); err != nil {
 		return err
@@ -74,7 +76,7 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 		outPath:    defaultOutPath,
 	}
 
-	fs := flag.NewFlagSet("skillsgen", flag.ContinueOnError)
+	fs := flag.NewFlagSet("reportgen", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.StringVar(&cfg.skillsPath, "skills", cfg.skillsPath, "path to the skill registry")
 	fs.StringVar(&cfg.testsDir, "tests", cfg.testsDir, "path to the tests directory")

@@ -2,34 +2,40 @@
 #
 # See PROTOCOL.adoc.
 #
-# This is the source of truth for skills and milestones.
-# It goes without saying, but do not update by hand!
-# Confidence values are computed on demand by
-# `cmd/skillsgen` from `tests/*/scorecard.yaml`.
+# This is the source of truth for skills. It goes without saying, but do not
+# update ladder state by hand. It's computed on demand by `cmd/reportgen`
+# from `tests/*/`.
 #
-# Every skill is flat and independently scoreable.
-# `categories` are just optional display metadata, and are computed by
-# `cmd/skillsgen` as the *minimum* confidence among their member skills.
-# `level` is its own required field, not a category, since every skill
-# needs exactly one and it drives `README.md`'s top-level sections.
+# Every skill is flat, independently scoreable, and stands on its own.
+# Its label must be a complete, standalone claim.
 #
-# The label conventions are borrowed from the CEFR
-# (Common European Framework of Reference for Languages).
-# `kind:skill` such as "Can <verb> ..." and  "Can Do" descriptors used
-# for language-proficiency levels (A1-C2), applied here to Go instead.
-# `kind:milestone` labels read "Has <past participle> ..." (a one-time
-# completed event, not an ongoing ability). Skills grouped under a
-# category (goroutines, net/http, memory model) are kept as bare nouns.
+# Label convention, borrowed from the CEFR (Common European Framework of
+# Reference for Languages) "Can Do" descriptors used for language-proficiency
+# levels (A1-C2), applied here to Go instead: every label reads "Can <verb>
+# ...". A one-time, externally verifiable achievement (an OSS contribution, a
+# language contribution) is still a skill, not a special case. Its
+# evidence is a test whose attempt notes record what was checked (a URL,
+# confirmed authorship and merge status), the same mechanism as everything
+# else.
+#
+# `rubric` is a tiered pass bar, required on every skill: up to three
+# one-sentence bars (orange/yellow/green) the agent grades an attempt
+# against, top-down. `green` is always required; `orange`/`yellow` are
+# optional and fill from the bottom (a skill can't define `yellow` without
+# `orange`). A skill that's genuinely binary defines `green` alone. See
+# "Skill registry" and "Skills are flat" in PROTOCOL.adoc for the full
+# split-vs-tier principle: split a skill in two when it bundles two
+# different commands, tier one skill when it's a depth gradient on the same
+# command, and leave a skill single-tier otherwise.
+#
+# `level` is its own required field, not a category, since every skill needs
+# exactly one and it drives `README.md`'s top-level sections.
 
 levels: [Beginner, Intermediate, Proficient, Expert]
 
-# This skill list isn't arbitrary -- it's grounded in the resources below.
-# Each reference tags the `topics` it covers rather than being pinned to one
-# skill (most cover several at once, and forcing a single citation per skill
-# would overstate the precision). Where a topic has no single canonical
-# source (e.g. "design large-scale systems", "debug complex issues"), it's
-# left uncited rather than force-fit to something that doesn't really cover
-# it.
+# This skill list is grounded in the resources below.
+# Each reference tags the `topics` it covers, when available. Where a topic
+# has no single canonical source, it is left uncited.
 references:
   - name: A Tour of Go
     url: https://go.dev/tour/
@@ -105,6 +111,13 @@ references:
   - name: The Go Programming Language Specification
     url: https://go.dev/ref/spec
     topics: [The language itself]
+  - name: 100 Go Mistakes and How to Avoid Them
+    authors: [Teiva Harsanyi]
+    url: https://www.manning.com/books/100-go-mistakes-and-how-to-avoid-them
+    topics: [Beginner, Package use, Concurrency, Error handling, Testing, Performance]
+  - name: When To Use Generics
+    url: https://go.dev/blog/when-generics
+    topics: [The language itself]
 
 categories:
   concurrency_basics:
@@ -122,219 +135,652 @@ categories:
 
 skills:
   # Beginner
-  - slug: read_simple_code
-    label: Can read simple code
+  - slug: read_basic_code
+    label: Can read and explain basic Go programs
+    rubric:
+      orange: >
+        Given a short program using variables, basic types, and fmt output,
+        correctly explains what it does and predicts its output without
+        running it.
+      yellow: >
+        Given a short program that also uses conditionals and loops,
+        correctly explains its control flow and predicts its output.
+      green: >
+        Given a short program that also uses structs and multi-value
+        returns, correctly explains it end to end and predicts its output.
     level: Beginner
-    kind: skill
-  - slug: basic_syntax
-    label: Can understand basic syntax
+  - slug: fix_basic_code
+    label: Can fix bugs in basic Go programs
+    rubric:
+      orange: >
+        Given a broken program using variables and basic types, finds and
+        correctly fixes a logic bug.
+      yellow: >
+        Given a broken program that also uses conditionals or loops, finds
+        and correctly fixes the bug.
+      green: >
+        Given a broken program that also uses structs or function
+        signatures, finds and correctly fixes the bug.
     level: Beginner
-    kind: skill
+  - slug: variables_and_constants
+    label: Can declare and use variables and constants
+    rubric:
+      orange: >
+        Declares and uses variables correctly with both var and short
+        variable declaration (:=).
+      yellow: >
+        Correctly relies on a variable's zero value instead of redundantly
+        initializing it.
+      green: >
+        Declares and uses constants (const, including iota where relevant)
+        and explains when to prefer const over var.
+    level: Beginner
+  - slug: basic_types
+    label: Can use Go's basic types
+    rubric:
+      orange: >
+        Correctly uses int, string, and bool for a given task.
+      yellow: >
+        Correctly uses float64 and rune, and explains the difference
+        between a byte and a rune.
+      green: >
+        Names and explains at least one further numeric type Go supports
+        (e.g. complex64/128, or a fixed-width int/uint variant) and when it
+        would be used.
+    level: Beginner
+  - slug: conditionals
+    label: Can use if/else to branch on a condition
+    rubric:
+      orange: >
+        Uses a single if statement (with or without else) to branch on a
+        condition correctly.
+      yellow: >
+        Uses if/else if/else chains to branch across more than two outcomes
+        correctly.
+      green: >
+        Uses the if-with-initializer idiom (e.g. if err := f(); err != nil
+        { ... }) to correctly scope a value to the conditional.
+    level: Beginner
+  - slug: loops
+    label: Can use for loops
+    rubric:
+      orange: >
+        Uses a three-clause for loop (init; condition; post) correctly.
+      yellow: >
+        Uses a condition-only for loop (Go's while-equivalent) correctly.
+      green: >
+        Uses a range-based for loop to iterate a slice, array, or map
+        correctly.
+    level: Beginner
+  - slug: switch_statement
+    label: Can use switch statements
+    rubric:
+      orange: >
+        Uses a basic value switch with multiple cases instead of an
+        equivalent if/else if chain.
+      yellow: >
+        Uses fallthrough, or multiple values in a single case, correctly.
+      green: >
+        Uses a condition-less switch as an idiomatic if/else if
+        replacement.
+    level: Beginner
+  - slug: structs_basic
+    label: Can define and use structs
+    rubric:
+      orange: >
+        Defines a struct type and creates an instance via a struct literal.
+      green: >
+        Reads and writes a struct's fields correctly, both through a value
+        and through a pointer.
+    level: Beginner
   - slug: write_simple_functions
     label: Can write simple functions
+    rubric:
+      orange: >
+        Writes a function with the correct signature, a single parameter,
+        and a single return value that solves the stated problem.
+      yellow: >
+        Writes a function with multiple parameters and/or multiple return
+        values, used correctly by its caller.
+      green: >
+        Uses named return values or a variadic parameter correctly where the
+        problem calls for it.
     level: Beginner
-    kind: skill
 
   # Intermediate
   - slug: write_complete_programs
     label: Can write complete programs
+    rubric:
+      orange: >
+        Writes a runnable, multi-function Go program (with a main
+        package/func) that solves a simple problem end to end.
+      green: >
+        The program is organized into more than a single do-everything main
+        function, with error cases handled rather than ignored.
     level: Intermediate
-    kind: skill
   - slug: goroutines
-    label: goroutines
+    label: Can use goroutines
+    rubric:
+      orange: >
+        Launches one or more goroutines correctly to run work concurrently.
+      yellow: >
+        Launches multiple goroutines and correctly waits for all of them to
+        finish before the program exits.
+      green: >
+        The above is verified free of data races (e.g. via go test/go run
+        -race).
     level: Intermediate
-    kind: skill
     categories: [concurrency_basics]
   - slug: channels
-    label: channels
+    label: Can use channels to communicate between goroutines
+    rubric:
+      orange: >
+        Uses a channel to send and receive a single value between two
+        goroutines correctly.
+      yellow: >
+        Uses a buffered channel, or closes a channel correctly to signal
+        completion to a receiver.
+      green: >
+        Coordinates multiple goroutines via channels without deadlocking or
+        leaking.
     level: Intermediate
-    kind: skill
     categories: [concurrency_basics]
   - slug: select_statement
-    label: select
+    label: Can use select to coordinate multiple channels
+    rubric:
+      orange: >
+        Uses select to receive from more than one channel correctly.
+      yellow: >
+        Uses a default case in a select for a non-blocking channel
+        operation.
+      green: >
+        Uses select with a timeout (time.After) or a done-channel to
+        implement cancellation.
     level: Intermediate
-    kind: skill
     categories: [concurrency_basics]
   - slug: sync_primitives
-    label: sync primitives (Mutex, WaitGroup, Once)
+    label: Can use sync primitives (Mutex, WaitGroup, Once)
+    rubric:
+      orange: >
+        Uses sync.Mutex (or RWMutex) correctly to protect shared state from
+        concurrent access.
+      yellow: >
+        Uses sync.WaitGroup correctly to wait for a group of goroutines to
+        finish.
+      green: >
+        Uses sync.Once appropriately, or chooses RWMutex over Mutex when
+        reads dominate writes.
     level: Intermediate
-    kind: skill
     categories: [concurrency_basics]
   - slug: choosing_concurrency_primitives
     label: Can choose the right concurrency primitive for the job
+    rubric:
+      green: >
+        Given a concurrency problem, picks a defensible primitive
+        (goroutines+channels vs. sync primitives vs. neither) for the
+        scenario and can explain why the alternatives fit worse.
     level: Intermediate
-    kind: skill
     categories: [concurrency_basics]
   - slug: use_interfaces
     label: Can use interfaces
+    rubric:
+      orange: >
+        Defines a small interface and a concrete type that implicitly
+        satisfies it.
+      yellow: >
+        Uses the interface type, not the concrete type, in a function
+        signature to decouple a dependency.
+      green: >
+        Designs the interface from the consumer's perspective (small and
+        focused) rather than mirroring the concrete type's entire method
+        set.
     level: Intermediate
-    kind: skill
   - slug: write_tests
     label: Can write tests
+    rubric:
+      orange: >
+        Writes a testing-package test that exercises the code under test
+        and fails when the code is broken.
+      yellow: >
+        Covers more than the single happy-path case in the same test.
+      green: >
+        Uses subtests (t.Run) to organize related cases clearly.
     level: Intermediate
-    kind: skill
   - slug: work_with_packages
     label: Can work with packages
+    rubric:
+      orange: >
+        Organizes code into more than one package with correct import
+        paths.
+      yellow: >
+        Uses exported/unexported naming to intentionally control the
+        package's public surface.
+      green: >
+        The package boundary reflects a sensible responsibility split, with
+        no circular dependency.
     level: Intermediate
-    kind: skill
+  - slug: struct_embedding
+    label: Can use struct embedding for composition
+    rubric:
+      orange: >
+        Embeds a struct type in another struct and correctly accesses a
+        promoted field.
+      yellow: >
+        Correctly accesses a promoted method through embedding.
+      green: >
+        Correctly resolves a field/method name collision introduced by
+        embedding, or explains why composition was chosen over an
+        inheritance-style workaround.
+    level: Intermediate
+  - slug: type_conversion
+    label: Can perform explicit type conversions
+    rubric:
+      orange: >
+        Converts between related numeric types (e.g. int/float64) using
+        Go's explicit conversion syntax correctly.
+      yellow: >
+        Converts between numeric types and string using strconv correctly.
+      green: >
+        Explains why Go requires explicit conversion instead of implicit
+        coercion.
+    level: Intermediate
+  - slug: generics
+    label: Can write and use generic functions and types
+    rubric:
+      orange: >
+        Writes or uses a generic function with a single type parameter and
+        a simple constraint (e.g. comparable) correctly.
+      yellow: >
+        Writes or uses a generic type (not just a function) with type
+        parameters correctly.
+      green: >
+        Writes a custom constraint interface, or correctly judges that a
+        non-generic version would require duplicating the same logic per
+        type.
+    level: Intermediate
   - slug: net_http
-    label: net/http
+    label: Can use net/http
+    rubric:
+      orange: >
+        Makes a basic HTTP client request and correctly handles the
+        response and error.
+      yellow: >
+        Serves a basic HTTP handler (http.HandlerFunc) correctly.
+      green: >
+        Sets an appropriate timeout or context on a client request, or
+        routes multiple handlers via http.ServeMux.
     level: Intermediate
-    kind: skill
     categories: [stdlib_fluency]
   - slug: encoding_json
-    label: encoding/json
+    label: Can use encoding/json
+    rubric:
+      orange: >
+        Marshals a Go value to JSON correctly.
+      yellow: >
+        Unmarshals JSON into a Go value correctly, including struct tags
+        where needed.
+      green: >
+        Correctly handles optional/unknown JSON fields (e.g. omitempty,
+        pointer fields for optionality) or a decoding error.
     level: Intermediate
-    kind: skill
     categories: [stdlib_fluency]
   - slug: os_package
-    label: os
+    label: Can use the os package
+    rubric:
+      orange: >
+        Reads command-line arguments or environment variables correctly via
+        the os package.
+      yellow: >
+        Reads or writes a file via the os package with correct error
+        handling.
+      green: >
+        Distinguishes and handles a specific os-level error (e.g.
+        file-not-found vs. permission denied) rather than treating all
+        errors alike.
     level: Intermediate
-    kind: skill
     categories: [stdlib_fluency]
   - slug: io_package
-    label: io
+    label: Can use the io package
+    rubric:
+      orange: >
+        Uses io.Reader or io.Writer as a function parameter or return type
+        instead of a concrete type.
+      yellow: >
+        Uses io.Copy to move data between a reader and a writer instead of
+        reading everything into memory first.
+      green: >
+        Composes io interfaces (e.g. io.TeeReader, io.MultiWriter, or a
+        custom wrapper) to solve a task.
     level: Intermediate
-    kind: skill
     categories: [stdlib_fluency]
   - slug: time_package
-    label: time
+    label: Can use the time package
+    rubric:
+      orange: >
+        Uses time.Duration and correctly formats or parses a time value.
+      yellow: >
+        Uses a time.Timer or time.Ticker correctly.
+      green: >
+        Avoids a common time pitfall (e.g. comparing times with == instead
+        of Equal/Before/After, or leaking a timer/ticker by not stopping
+        it).
     level: Intermediate
-    kind: skill
+    categories: [stdlib_fluency]
+  - slug: string_manipulation
+    label: Can manipulate strings using the standard library
+    rubric:
+      orange: >
+        Uses the strings package (e.g. Split, Join, Contains) to solve a
+        manipulation task.
+      yellow: >
+        Uses strconv for value-to-string or string-to-value conversions
+        within the same task.
+      green: >
+        Uses strings.Builder instead of + concatenation for repeated
+        string building.
+    level: Intermediate
+    categories: [stdlib_fluency]
+  - slug: structured_logging
+    label: Can use structured logging
+    rubric:
+      orange: >
+        Uses log/slog (or an equivalent structured logger) with a message
+        and at least one key-value field.
+      yellow: >
+        Uses appropriate log levels (e.g. Info/Warn/Error) for the
+        situation.
+      green: >
+        Attaches shared context to related log lines (e.g. via slog.With or
+        a contextual logger) instead of repeating fields at every call
+        site.
+    level: Intermediate
     categories: [stdlib_fluency]
   - slug: handle_errors
     label: Can handle errors properly
+    rubric:
+      orange: >
+        Checks and returns errors instead of silently ignoring them.
+      yellow: >
+        Returns an error for an ordinary failure condition instead of
+        panicking.
+      green: >
+        Returns an error at the point it's actually discovered rather than
+        letting it surface confusingly deeper in the call chain.
     level: Intermediate
-    kind: skill
 
   # Proficient
   - slug: design_services
     label: Can design and implement services from scratch
+    rubric:
+      orange: >
+        Designs and implements a small service from scratch (package
+        layout, config, entry point) that runs and does the stated job.
+      green: >
+        The service's dependencies are structured so they can be tested or
+        swapped (e.g. via a small interface or constructor injection), not
+        just a script with extra files.
     level: Proficient
-    kind: skill
   - slug: worker_pools
-    label: worker pools
+    label: Can implement a worker pool
+    rubric:
+      orange: >
+        Implements a worker pool that correctly bounds concurrency and
+        processes all submitted work.
+      green: >
+        The pool shuts down cleanly with no leaked goroutines and no
+        deadlock, even under cancellation.
     level: Proficient
-    kind: skill
     categories: [advanced_concurrency]
   - slug: fan_in_fan_out
-    label: fan-in/fan-out
+    label: Can implement fan-in/fan-out concurrency
+    rubric:
+      orange: >
+        Implements a fan-out stage that correctly distributes work across
+        multiple goroutines.
+      green: >
+        Implements the matching fan-in stage with no lost work and no
+        goroutine leaks.
     level: Proficient
-    kind: skill
     categories: [advanced_concurrency]
   - slug: pipelines
-    label: pipelines
+    label: Can build a concurrent pipeline
+    rubric:
+      orange: >
+        Builds a multi-stage concurrent pipeline using channels between
+        stages.
+      green: >
+        The pipeline handles cancellation cleanly, stopping every stage
+        promptly instead of leaking goroutines.
     level: Proficient
-    kind: skill
     categories: [advanced_concurrency]
   - slug: cancellation_propagation
-    label: cancellation propagation (context, errgroup)
+    label: Can propagate cancellation through goroutines (context, errgroup)
+    rubric:
+      orange: >
+        Propagates cancellation through a goroutine tree using context,
+        stopping work promptly when cancelled.
+      green: >
+        Uses errgroup (or equivalent) to combine cancellation with correct
+        error propagation across the same goroutine tree.
     level: Proficient
-    kind: skill
     categories: [advanced_concurrency]
   - slug: goroutine_leak_avoidance
-    label: avoiding goroutine leaks
+    label: Can avoid goroutine leaks
+    rubric:
+      green: >
+        Identifies or avoids a goroutine leak in a given scenario (e.g. a
+        goroutine blocked forever on a channel nobody will send to).
     level: Proficient
-    kind: skill
     categories: [advanced_concurrency]
   - slug: rate_limiting
-    label: rate limiting
+    label: Can implement rate limiting
+    rubric:
+      orange: >
+        Implements basic rate limiting for a given scenario (e.g. via
+        time.Ticker) that measurably enforces the stated limit.
+      green: >
+        Implements rate limiting that correctly handles bursts (e.g. via
+        golang.org/x/time/rate's token bucket) rather than only a steady
+        rate.
     level: Proficient
-    kind: skill
     categories: [advanced_concurrency]
   - slug: idiomatic_comments
     label: Can write clear comments
+    rubric:
+      orange: >
+        Avoids commenting self-evident code, and writes comments that
+        explain non-obvious intent (the why, not the what) where it's
+        actually needed.
+      green: >
+        Follows Go doc-comment conventions for exported identifiers (a
+        comment starting with the identifier's name).
     level: Proficient
-    kind: skill
     categories: [idiomatic_go]
   - slug: naming_conventions
     label: Can follow Go naming conventions
+    rubric:
+      green: >
+        Follows Go naming conventions (MixedCaps, short names in small
+        scopes, no stutter like pkg.PkgThing) throughout the code.
     level: Proficient
-    kind: skill
     categories: [idiomatic_go]
   - slug: idiomatic_error_handling
     label: Can handle errors idiomatically (wrapping, sentinel errors)
+    rubric:
+      orange: >
+        Wraps errors with context (%w or equivalent) where it helps a
+        caller diagnose the failure.
+      green: >
+        Uses sentinel errors or custom error types with errors.Is/errors.As,
+        rather than string-matching error messages.
     level: Proficient
-    kind: skill
     categories: [idiomatic_go]
   - slug: avoids_overabstraction
     label: Can avoid unnecessary abstraction/interfaces
+    rubric:
+      green: >
+        Solves the problem with concrete types and small interfaces,
+        without introducing unnecessary interfaces, layers, or generic
+        abstractions the problem doesn't call for.
     level: Proficient
-    kind: skill
     categories: [idiomatic_go]
+  - slug: type_conversion_judgment
+    label: Can judge when a type conversion is unsafe or unnecessary
+    rubric:
+      green: >
+        Identifies a conversion that loses precision, overflows, or is
+        needless in a given snippet, and either avoids it or flags the risk
+        explicitly.
+    level: Proficient
+  - slug: generics_judgment
+    label: Can judge when generics are the right tool
+    rubric:
+      green: >
+        Given a design problem, correctly decides between a generic
+        function/type, a plain interface, or code duplication, and
+        explains why the alternatives are worse for this case.
+    level: Proficient
+  - slug: reflection
+    label: Can use reflection judiciously
+    rubric:
+      green: >
+        Uses the reflect package correctly for a task that genuinely needs
+        it, and can explain its runtime cost and why it should be avoided
+        when a generic function or interface would do.
+    level: Proficient
   - slug: comprehensive_testing
     label: Can write comprehensive test suites (table-driven tests, mocks/fakes, httptest, benchmarks)
+    rubric:
+      orange: >
+        Writes table-driven tests covering more than the single happy-path
+        case.
+      yellow: >
+        Uses mocks or fakes to isolate the code under test from a real
+        dependency.
+      green: >
+        Uses httptest or a benchmark where relevant to the code under test.
     level: Proficient
-    kind: skill
   - slug: code_review
     label: Can give useful code review feedback on others' Go code
+    rubric:
+      green: >
+        Given a real snippet of someone else's Go code, gives specific,
+        actionable feedback that identifies at least one genuine issue
+        (correctness, idiom, or design) and explains why it matters.
     level: Proficient
-    kind: skill
   - slug: optimize_performance
     label: Can optimize performance
+    rubric:
+      green: >
+        Given a slow piece of Go code, identifies the actual bottleneck
+        (e.g. via pprof/benchmarks) and applies a fix that measurably
+        improves it.
     level: Proficient
-    kind: skill
   - slug: debug_complex_issues
     label: Can debug complex issues
+    rubric:
+      green: >
+        Given a non-trivial bug (e.g. a race, a subtle logic error, a
+        resource leak), finds the root cause and fixes it, not just the
+        symptom.
     level: Proficient
-    kind: skill
   - slug: contribute_oss
-    label: Has contributed to open source projects
+    label: Can contribute to open source Go projects
+    rubric:
+      green: >
+        Has an accepted, merged contribution to a real open-source Go
+        project, verified by a checked, linked PR/commit.
     level: Proficient
-    kind: milestone
-    achieved: false
   - slug: go_internals_memory_model
-    label: memory model
+    label: Can explain the Go memory model
+    rubric:
+      green: >
+        Correctly explains what the Go memory model does and doesn't
+        guarantee about visibility of writes across goroutines without
+        synchronization.
     level: Proficient
-    kind: skill
     categories: [go_internals]
   - slug: go_internals_gc
-    label: GC
+    label: Can explain how Go's garbage collector works
+    rubric:
+      green: >
+        Correctly explains, at a working level, how Go's garbage collector
+        operates (concurrent, tri-color mark-and-sweep) and what affects GC
+        pressure.
     level: Proficient
-    kind: skill
     categories: [go_internals]
   - slug: escape_analysis
-    label: escape analysis
+    label: Can explain escape analysis
+    rubric:
+      green: >
+        Correctly predicts, for a given piece of code, whether a value
+        escapes to the heap or stays on the stack, and explains why.
     level: Proficient
-    kind: skill
     categories: [go_internals]
   - slug: interface_internals
-    label: interface internals (itab/eface)
+    label: Can explain how Go interfaces are represented internally (itab/eface)
+    rubric:
+      green: >
+        Correctly explains how Go represents interface values internally
+        (itab/eface) and uses that to explain a related surprise (e.g. a
+        nil-pointer-in-interface bug).
     level: Proficient
-    kind: skill
     categories: [go_internals]
 
   # Expert
   - slug: design_large_scale_systems
     label: Can design large-scale systems
+    rubric:
+      green: >
+        Produces a system design (services, data flow, failure handling)
+        for a large-scale scenario that a senior engineer would accept as
+        sound, defending the key tradeoffs when challenged.
     level: Expert
-    kind: skill
   - slug: scheduler_internals
-    label: scheduler (GMP model, work stealing)
+    label: Can explain the Go scheduler (GMP model, work stealing)
+    rubric:
+      green: >
+        Correctly explains the GMP model and work-stealing scheduler at a
+        working level, and uses that model to explain an observed
+        scheduling behavior.
     level: Expert
-    kind: skill
     categories: [deep_go_internals]
   - slug: compiler_ssa
-    label: compiler/SSA basics
+    label: Can explain the Go compiler's SSA optimization pipeline
+    rubric:
+      green: >
+        Correctly explains, at a working level, how the Go compiler's
+        SSA-based backend affects a given optimization or its absence.
     level: Expert
-    kind: skill
     categories: [deep_go_internals]
   - slug: unsafe_cgo
-    label: unsafe and cgo boundaries
+    label: Can safely use unsafe and cgo
+    rubric:
+      green: >
+        Uses unsafe or cgo correctly and only where genuinely warranted,
+        stating the safety obligations being taken on.
     level: Expert
-    kind: skill
     categories: [deep_go_internals]
   - slug: memory_ordering
-    label: memory ordering / sync/atomic guarantees
+    label: Can reason about memory ordering and sync/atomic guarantees
+    rubric:
+      green: >
+        Correctly reasons about memory ordering and the guarantees (or lack
+        of them) provided by sync/atomic in a given concurrent scenario.
     level: Expert
-    kind: skill
     categories: [deep_go_internals]
   - slug: high_performance_concurrent_code
     label: Can write high-performance, concurrent code
+    rubric:
+      green: >
+        Writes concurrent code that meets a stated performance target
+        without sacrificing correctness (verified by both benchmark and
+        -race).
     level: Expert
-    kind: skill
   - slug: contribute_go_language
-    label: Has contributed to the Go language itself
+    label: Can contribute to the Go language itself
+    rubric:
+      green: >
+        Has an accepted contribution (a merged/accepted CL) to the Go
+        project itself, verified by a checked, linked changelist.
     level: Expert
-    kind: milestone
-    achieved: false

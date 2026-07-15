@@ -16,25 +16,40 @@ func TestMarkdownEscaping(t *testing.T) {
 	}
 }
 
+func TestBuildTestIndexNumbersOnlyAttemptedTests(t *testing.T) {
+	cards := []Scorecard{
+		{Name: "alpha", Attempts: []Attempt{{Tiers: []SkillTier{{Skill: "s", Tier: stateGreen}}}}},
+		{Name: "no_attempts_yet"},
+		{Name: "beta", Attempts: []Attempt{{Tiers: []SkillTier{{Skill: "s", Tier: stateYellow}}}}},
+	}
+
+	numbers, index := buildTestIndex(cards)
+	if got, want := numbers["alpha"], 1; got != want {
+		t.Fatalf("numbers[alpha] = %d, want %d", got, want)
+	}
+	if got, want := numbers["beta"], 2; got != want {
+		t.Fatalf("numbers[beta] = %d, want %d", got, want)
+	}
+	if _, exists := numbers["no_attempts_yet"]; exists {
+		t.Fatal("buildTestIndex() numbered a test with no attempts")
+	}
+	if len(index) != 2 {
+		t.Fatalf("len(index) = %d, want 2", len(index))
+	}
+}
+
 func TestRenderMarkdownEscapesDynamicContent(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "README.md")
 	data := reportData{
 		Levels: []LevelView{{
 			Name: "Beginner|Level",
 			Skills: []SkillView{{
-				Label:         "Can read | explain",
-				Kind:          kindSkill,
-				Confidence:    30,
-				HasData:       true,
-				EvidenceTests: []string{"spot|bug"},
-				Emoji:         colorEmoji(colorRed),
-			}},
-			Categories: []CategoryView{{
-				Label:      "Core|Skills",
-				HasData:    false,
-				Emoji:      colorEmoji(colorGrey),
-				Skills:     []SkillView{{Label: "Nested|Skill", Kind: kindMilestone, StatusText: "not yet", Emoji: colorEmoji(colorGrey)}},
-				Confidence: 0,
+				Label:          "Can read | explain",
+				StatusText:     "red",
+				HasData:        true,
+				CategoryLabels: []string{"Core|Skills"},
+				Evidence:       []EvidenceLink{{Number: 1, TestID: "spot_bug"}},
+				Emoji:          colorEmoji(colorRed),
 			}},
 		}},
 		References: []ReferenceView{{
@@ -42,6 +57,7 @@ func TestRenderMarkdownEscapesDynamicContent(t *testing.T) {
 			URL:         "https://example.test/a file(1)",
 			AuthorsText: "A | B",
 		}},
+		TestIndex: []TestIndexEntry{{Number: 1, TestID: "spot_bug"}},
 	}
 
 	if err := renderMarkdown(out, data); err != nil {
@@ -54,8 +70,8 @@ func TestRenderMarkdownEscapesDynamicContent(t *testing.T) {
 	got := string(b)
 	for _, want := range []string{
 		"## Beginner\\|Level",
-		"| 🔴 | Can read \\| explain | 30 (spot\\|bug) |",
-		"| ⚪ | **Core\\|Skills** | untested |",
+		"| 🔴 | Can read \\| explain | Core\\|Skills | red | [1](tests/spot_bug/) |",
+		"1. [spot_bug](tests/spot_bug/)",
 		"[Ref \\| Name](https://example.test/a%20file%281%29), A \\| B",
 	} {
 		if !strings.Contains(got, want) {

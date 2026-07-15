@@ -18,17 +18,22 @@ references:
     topics: [Beginner]
 categories: {}
 skills:
-  - slug: read_simple_code
+  - slug: read_basic_code
     label: Can read simple code
+    rubric:
+      green: >
+        Reads a short function aloud and correctly explains what it does.
     level: Beginner
-    kind: skill
 `)
-	writeTestFile(t, filepath.Join(dir, "tests", "read_code", "scorecard.yaml"), `
+	writeTestFile(t, filepath.Join(dir, "tests", "read_code", "metadata.yaml"), `
 name: read_code
 summary: >
   Read a small function.
 assesses:
-  - read_simple_code
+  - read_basic_code
+`)
+	writeTestFile(t, filepath.Join(dir, "tests", "read_code", "scorecard.yaml"), `
+test_id: read_code
 demonstrated: []
 passed: false
 attempts: []

@@ -9,9 +9,14 @@ import (
 	"time"
 )
 
-const passingScore = 80
-
 var slugPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+// attemptDateLayout requires minute precision, not just a bare date. Two
+// attempts landing on the same calendar date but in different tests need a
+// real ordering signal -- otherwise the ladder falls back to directory
+// iteration order, an incidental property, instead of what actually
+// happened first (see confidence.go's date-ordered fold).
+const attemptDateLayout = "2006-01-02T15:04"
 
 // validationError reports every problem found in one pass. A generator should
 // not make users fix data one typo at a time when all invariants are knowable.
@@ -116,9 +121,8 @@ func validateSkillsFile(v *validator, sf SkillsFile) registryIndex {
 	return index
 }
 
-// validateSkill checks one skills.yaml entry against the flat-skill model.
-// It intentionally treats categories as rollup metadata, not as type names or
-// namespace qualifiers.
+// validateSkill checks one skills.yaml entry against the flat-skill model:
+// every skill is independently scoreable regardless of category membership.
 func validateSkill(v *validator, path string, skill Skill, index registryIndex) {
 	if strings.TrimSpace(skill.Slug) == "" {
 		v.addf("%s: slug is required", path)
@@ -131,27 +135,9 @@ func validateSkill(v *validator, path string, skill Skill, index registryIndex) 
 	if strings.TrimSpace(skill.Label) == "" {
 		v.addf("%s: label is required", path)
 	}
+	validateRubric(v, path, skill.Rubric)
 	if _, exists := index.levels[skill.Level]; !exists {
 		v.addf("%s: level %q is not declared in levels", path, skill.Level)
-	}
-
-	switch skill.Kind {
-	case kindSkill:
-		if skill.Evidence != "" {
-			v.addf("%s: skill entries must not set evidence", path)
-		}
-	case kindMilestone:
-		if len(skill.Categories) != 0 {
-			v.addf("%s: milestones must not belong to confidence rollup categories", path)
-		}
-		if skill.Achieved && strings.TrimSpace(skill.Evidence) == "" {
-			v.addf("%s: achieved milestones must include evidence", path)
-		}
-		if skill.Evidence != "" {
-			validateURL(v, path+": evidence", skill.Evidence)
-		}
-	default:
-		v.addf("%s: kind %q must be %q or %q", path, skill.Kind, kindSkill, kindMilestone)
 	}
 
 	seenCategories := map[string]struct{}{}
@@ -164,6 +150,19 @@ func validateSkill(v *validator, path string, skill Skill, index registryIndex) 
 		if _, exists := index.categories[categorySlug]; !exists {
 			v.addf("%s: category %q is not declared", path, categorySlug)
 		}
+	}
+}
+
+// validateRubric enforces the tiered-rubric shape: Green is always required
+// (every skill needs at least a top bar), and tiers fill from the bottom --
+// a skill can't define Yellow without also defining Orange, since a rung
+// with no written bar beneath it isn't reachable in any meaningful way.
+func validateRubric(v *validator, path string, rubric Rubric) {
+	if strings.TrimSpace(rubric.Green) == "" {
+		v.addf("%s: rubric.green is required -- every skill needs at least a top bar", path)
+	}
+	if strings.TrimSpace(rubric.Yellow) != "" && strings.TrimSpace(rubric.Orange) == "" {
+		v.addf("%s: rubric.yellow is set without rubric.orange -- tiers fill from the bottom, none can be skipped", path)
 	}
 }
 
@@ -186,50 +185,63 @@ func validateReference(v *validator, path string, ref Reference) {
 	}
 }
 
-// validateScorecards checks every loaded scorecard against the already-indexed
-// registry. Missing scorecard.yaml files are handled by the loader so this
-// function only sees scorecards that intentionally exist.
+// validateScorecards checks every loaded test against the already-indexed
+// registry. Missing metadata.yaml/scorecard.yaml pairs are handled by the
+// loader so this function only sees tests that intentionally exist.
 func validateScorecards(v *validator, sf SkillsFile, index registryIndex, cards []Scorecard) {
 	for _, card := range cards {
-		path := card.Path
-		if path == "" {
-			path = fmt.Sprintf("scorecard %q", card.Name)
-		}
-		validateScorecard(v, sf, index, path, card)
+		validateScorecard(v, sf, index, card)
 	}
 }
 
-// validateScorecard enforces the scorecard schema plus derived invariants such
-// as "passed" matching the attempt history.
-func validateScorecard(v *validator, sf SkillsFile, index registryIndex, path string, card Scorecard) {
+// validateScorecard enforces the metadata/scorecard schema plus derived
+// invariants: the directory name, metadata.yaml's name, and scorecard.yaml's
+// own test_id must all agree, and "passed" must match the attempt history.
+func validateScorecard(v *validator, sf SkillsFile, index registryIndex, card Scorecard) {
+	if !validSlug(card.DirName) {
+		v.addf("tests/%s: directory name must match %s", card.DirName, slugPattern.String())
+	}
 	if strings.TrimSpace(card.Name) == "" {
-		v.addf("%s: name is required", path)
-	} else if card.TestID != "" && card.Name != card.TestID {
-		v.addf("%s: name %q must match directory %q", path, card.Name, card.TestID)
+		v.addf("%s: name is required", card.MetaPath)
+	} else if card.Name != card.DirName {
+		v.addf("%s: name %q must match directory %q", card.MetaPath, card.Name, card.DirName)
 	}
 	if strings.TrimSpace(card.Summary) == "" {
-		v.addf("%s: summary is required", path)
+		v.addf("%s: summary is required", card.MetaPath)
 	}
 	if len(card.Assesses) == 0 {
-		v.addf("%s: assesses must contain at least one skill slug", path)
+		v.addf("%s: assesses must contain at least one skill slug", card.MetaPath)
+	}
+
+	if strings.TrimSpace(card.TestID) == "" {
+		v.addf("%s: test_id is required", card.ScorePath)
+	} else if card.TestID != card.DirName {
+		v.addf("%s: test_id %q must match directory %q", card.ScorePath, card.TestID, card.DirName)
 	}
 
 	seenEvidenceSlugs := map[string]string{}
-	validateEvidenceSlugs(v, sf, index, path, "assesses", card.Assesses, seenEvidenceSlugs)
-	validateEvidenceSlugs(v, sf, index, path, "demonstrated", card.Demonstrated, seenEvidenceSlugs)
+	validateEvidenceSlugs(v, sf, index, card.MetaPath, "assesses", card.Assesses, seenEvidenceSlugs)
+	validateEvidenceSlugs(v, sf, index, card.ScorePath, "demonstrated", card.Demonstrated, seenEvidenceSlugs)
+
+	relevantSlugs := map[string]struct{}{}
+	for _, slug := range card.Assesses {
+		relevantSlugs[slug] = struct{}{}
+	}
+	for _, slug := range card.Demonstrated {
+		relevantSlugs[slug] = struct{}{}
+	}
 
 	for i, attempt := range card.Attempts {
-		validateAttempt(v, fmt.Sprintf("%s: attempts[%d]", path, i), attempt)
+		validateAttempt(v, fmt.Sprintf("%s: attempts[%d]", card.ScorePath, i), attempt, index, relevantSlugs)
 	}
 	expectedPassed := scorecardPassed(card.Attempts)
 	if card.Passed != expectedPassed {
-		v.addf("%s: passed is %t, want %t based on attempts", path, card.Passed, expectedPassed)
+		v.addf("%s: passed is %t, want %t based on attempts", card.ScorePath, card.Passed, expectedPassed)
 	}
 }
 
 // validateEvidenceSlugs checks assesses/demonstrated lists. A slug may appear
-// once across both lists, must name a skill, and must not name a category or
-// milestone.
+// once across both lists and must name a real skill, never a category.
 func validateEvidenceSlugs(v *validator, sf SkillsFile, index registryIndex, path, field string, slugs []string, seen map[string]string) {
 	for i, slug := range slugs {
 		fieldPath := fmt.Sprintf("%s: %s[%d]", path, field, i)
@@ -242,53 +254,103 @@ func validateEvidenceSlugs(v *validator, sf SkillsFile, index registryIndex, pat
 			continue
 		}
 		seen[slug] = field
-		skill, exists := index.skills[slug]
-		if !exists {
+		if _, exists := index.skills[slug]; !exists {
 			if _, isCategory := sf.Categories[slug]; isCategory {
 				v.addf("%s references category %q; scorecards must reference skill slugs", fieldPath, slug)
 				continue
 			}
 			v.addf("%s references unknown skill slug %q", fieldPath, slug)
-			continue
-		}
-		if skill.Kind == kindMilestone {
-			v.addf("%s references milestone %q; milestones are not scored by tests", fieldPath, slug)
 		}
 	}
 }
 
-// validateAttempt checks the values that feed the confidence algorithm. Keeping
-// invalid numbers and tiers out here lets confidence.go stay pure arithmetic.
-func validateAttempt(v *validator, path string, attempt Attempt) {
-	if _, err := time.Parse(time.DateOnly, attempt.Date); err != nil {
-		v.addf("%s: date %q must use YYYY-MM-DD", path, attempt.Date)
+// validateAttempt checks the values that feed the ladder algorithm. Keeping
+// invalid tiers out here lets confidence.go stay pure state transitions with
+// no defensive input-checking of its own.
+//
+// index and relevantSlugs let this check two things a bare enum check
+// can't: that every skill graded here is actually one this test assesses or
+// demonstrates (relevantSlugs), and that the tier graded is one the skill's
+// own rubric actually defines (index) -- a green-only skill can never be
+// handed tier: orange, because there's no written orange bar for it to mean
+// anything.
+func validateAttempt(v *validator, path string, attempt Attempt, index registryIndex, relevantSlugs map[string]struct{}) {
+	if _, err := time.Parse(attemptDateLayout, attempt.Date); err != nil {
+		v.addf("%s: date %q must use YYYY-MM-DDTHH:MM", path, attempt.Date)
 	}
-	if attempt.Score < 0 || attempt.Score > 100 {
-		v.addf("%s: score %d must be between 0 and 100", path, attempt.Score)
+	if len(attempt.Tiers) == 0 {
+		v.addf("%s: tiers must grade at least one skill", path)
 	}
-	if !validConfidence(attempt.Confidence) {
-		v.addf("%s: confidence %q must be %q, %q, or %q", path, attempt.Confidence, confidenceLow, confidenceMedium, confidenceHigh)
+
+	seenSkills := map[string]struct{}{}
+	allGreen := true
+	for i, st := range attempt.Tiers {
+		tierPath := fmt.Sprintf("%s: tiers[%d]", path, i)
+		if strings.TrimSpace(st.Skill) == "" {
+			v.addf("%s: skill is required", tierPath)
+		} else if _, duplicate := seenSkills[st.Skill]; duplicate {
+			v.addf("%s: duplicate skill %q", tierPath, st.Skill)
+		} else {
+			seenSkills[st.Skill] = struct{}{}
+			if _, relevant := relevantSlugs[st.Skill]; !relevant {
+				v.addf("%s: skill %q is not in this test's assesses/demonstrated", tierPath, st.Skill)
+			}
+		}
+
+		if !validTier(st.Tier) {
+			v.addf("%s: tier %q must be %q, %q, %q, or %q -- graded directly against the skill's rubric, no free-floating confidence guess", tierPath, st.Tier, tierFail, stateOrange, stateYellow, stateGreen)
+		} else if skill, known := index.skills[st.Skill]; known && !rubricDefinesTier(skill.Rubric, st.Tier) {
+			v.addf("%s: tier %q is not defined in %q's rubric", tierPath, st.Tier, st.Skill)
+		}
+
+		if st.Tier != stateGreen {
+			allGreen = false
+		}
+	}
+
+	if strings.TrimSpace(attempt.Notes) == "" && !allGreen {
+		v.addf("%s: notes is required unless every graded skill is a clean green-tier pass -- a fail or a lower-tier pass has something worth explaining", path)
 	}
 }
 
-// scorecardPassed is the protocol's pass rule in executable form.
+// rubricDefinesTier reports whether a skill's rubric actually has a written
+// bar for the given tier. tierFail always counts -- it just means the
+// attempt didn't clear the lowest bar the skill defines, which is always a
+// meaningful outcome regardless of which tiers exist.
+func rubricDefinesTier(r Rubric, tier string) bool {
+	switch tier {
+	case tierFail:
+		return true
+	case stateOrange:
+		return strings.TrimSpace(r.Orange) != ""
+	case stateYellow:
+		return strings.TrimSpace(r.Yellow) != ""
+	case stateGreen:
+		return strings.TrimSpace(r.Green) != ""
+	default:
+		return false
+	}
+}
+
+// scorecardPassed is the protocol's test-level pass rule: did any attempt
+// clear at least the lowest defined tier for at least one graded skill. It
+// still matters enormously which tier a pass reached for what it proves
+// about each *skill* (see confidence.go), but a test that was cleared, even
+// narrowly, was cleared.
 func scorecardPassed(attempts []Attempt) bool {
 	for _, attempt := range attempts {
-		if attempt.Score >= passingScore && confidencePasses(attempt.Confidence) {
-			return true
+		for _, st := range attempt.Tiers {
+			if st.Tier != tierFail {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-// confidencePasses captures the "medium or high" half of the pass rule.
-func confidencePasses(confidence string) bool {
-	return confidence == confidenceMedium || confidence == confidenceHigh
-}
-
-// validConfidence is the enum check for attempt confidence.
-func validConfidence(confidence string) bool {
-	return confidence == confidenceLow || confidence == confidenceMedium || confidence == confidenceHigh
+// validTier is the enum check for an attempt's graded tier.
+func validTier(tier string) bool {
+	return tier == tierFail || tier == stateOrange || tier == stateYellow || tier == stateGreen
 }
 
 // validSlug keeps skill, category, and test-reference slugs shell- and

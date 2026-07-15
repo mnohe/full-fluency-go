@@ -1,10 +1,5 @@
-name: a_test_identifier
-summary: >
-  Identify code smells and fix them.
-assesses:
-  - read_simple_code
-  - write_simple_functions
+test_id: a_test_identifier
+passed: false
 demonstrated:
   - idiomatic_comments
-passed: false
 attempts: []

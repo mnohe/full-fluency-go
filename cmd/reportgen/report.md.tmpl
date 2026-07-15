@@ -1,0 +1,22 @@
+# Full Fluency: Go
+
+**Legend:** ⚪ untested &nbsp; 🔴 red &nbsp; 🟠 orange &nbsp; 🟡 yellow &nbsp; 🟢 green &nbsp; ⭐ mastered
+{{range .Levels}}
+## {{cell .Name}}
+
+| | Skill | Category | Status | Evidence |
+|---|---|---|---|---|
+{{range .Skills}}| {{.Emoji}} | {{cell .Label}} | {{cell .CategoriesText}} | {{.StatusText}} | {{evidence .}} |
+{{end}}
+{{end}}
+## Tests
+{{range .TestIndex}}
+{{.Number}}. [{{cell .TestID}}](tests/{{.TestID}}/)
+{{end}}
+## Bibliography
+{{range .References}}
+- {{link .Title .URL}}{{if .AuthorsText}}, {{cell .AuthorsText}}{{end}}
+{{end}}
+---
+
+*This is a generated progress report*, check out how in [the Full Fluency project](https://github.com/mnohe/full-fluency-go).
