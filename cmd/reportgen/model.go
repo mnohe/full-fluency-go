@@ -161,12 +161,17 @@ type Scorecard struct {
 
 // loadScorecards walks the first level of testsDir in lexical order (the
 // order os.ReadDir guarantees) so generated evidence trails remain
-// deterministic. A directory with neither file is skipped (not yet a test);
-// a directory with only one of the two is a load error, since a lone
-// metadata.yaml or scorecard.yaml is always a mistake, never a valid state.
+// deterministic. A missing testsDir is treated as zero tests, since
+// tests/ doesn't exist until the first test is created. A directory with
+// neither file is skipped (not yet a test); a directory with only one of
+// the two is a load error, since a lone metadata.yaml or scorecard.yaml is
+// always a mistake, never a valid state.
 func loadScorecards(testsDir string) ([]Scorecard, error) {
 	entries, err := os.ReadDir(testsDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("read tests directory %s: %w", testsDir, err)
 	}
 
