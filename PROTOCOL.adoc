@@ -2,8 +2,6 @@
 
 This file documents how `skills.yaml`, `practice/`, and `tests/` work together, and how `cmd/reportgen` turns them into `README.md`. Any AI agent picking up work in this repo should read this first as it defines the contract, not just a convention.
 
-For the reasoning behind these rules, see `RATIONALE.adoc`. This file stays action-oriented on purpose.
-
 == The pieces
 
 === Skill registry
