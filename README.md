@@ -2,11 +2,32 @@
 
 Track your Go proficiency from Beginner to Expert, guided and assessed by an AI coding agent.
 
+## Quick start
+
+1. Get your copy as explained in "Fork or template?" below, and open it in the devcontainer.
+2. Give an AI coding agent access to the repo.
+3. Ask it to administer a test and render the result:
+    ```
+    Test my Go skills and update the report.
+    ```
+
+Coupled with `AGENTS.md`, this should be enough for any decent AI agent to start testing and run the report generator tool, which will update `README.md`.
+
+## What it is
+
 This repository is meant to be used as a template for your own Go learning path. It contains a skill registry (`skills.yaml`), a protocol for how an agent administers and scores tests (`PROTOCOL.adoc`), and a report generator (`cmd/reportgen`) that renders your current standing into this repo's own `README.md`.
 
 This page you're reading now is the *onboarding* version. The first time you run the report generator, it overwrites this file with your live report. Nothing is lost: everything below only matters once, at setup time, and `PROTOCOL.adoc` remains for the actual rules. In any case, you can always read this document at [its original location](https://github.com/mnohe/full-fluency-go).
 
-## Fork or use as a template?
+## How it is used
+
+Ask your AI agent to administer a test, regenerate the report and publish its results — the prompt from Quick start above works for this. You can also ask for a test for certain skills, or whatever your AI agent will accept and understand.
+
+You can run `go run ./cmd/reportgen` any time to regenerate `README.md` and see where you stand, then commit it along with `skills.yaml` and `tests/*/scorecard.yaml` if you want your progress tracked (and shareable) over time. It is generated, not hand-edited. Always regenerate after logging an attempt rather than editing it directly. The very first run replaces this page with your report.
+
+You can work through `practice/` on your own. Agents should pick up `AGENTS.md` automatically. You can read `PROTOCOL.adoc` yourself for the actual rules it's following.
+
+### Fork or template?
 
 Both work, but one will leak your data.
 
@@ -15,15 +36,15 @@ Both work, but one will leak your data.
 
 After that, clone it locally and open it in the devcontainer. If you do want to contribute a fix back to the shared tooling (`cmd/reportgen`, `PROTOCOL.adoc`), you can clone this repository and create a pull request.
 
-## Quick start
-
-1. Get your copy as explained above, and open it in the devcontainer.
-2. Give an AI coding agent access to the repo and ask it to administer a test, or work through `practice/` on your own. Agents should pick up `AGENTS.md` automatically. You can read `PROTOCOL.adoc` yourself for the actual rules it's following.
-3. `go run ./cmd/reportgen` any time to regenerate `README.md` and see where you stand, then commit it along with `skills.yaml` and `tests/*/scorecard.yaml` if you want your progress tracked (and shareable) over time. It is generated, not hand-edited. Always regenerate after logging an attempt rather than editing it directly. The very first run replaces this page with your report.
-
 ## How it works
 
 `skills.yaml` is the source of truth, `cmd/reportgen` renders it (plus every `tests/*/scorecard.yaml`) into `README.md` (GitHub-native). `PROTOCOL.adoc` is the actual contract, including grading flow and the skill-state ladder. Read them before changing any of the above.
+
+## Agents
+
+Terminology around AI coding tools is inconsistent. OpenAI calls Codex a _coding agent_, Anthropic calls Claude Code an _agentic coding tool_, and other vendors use terms such as _agent mode_, _coding assistant_, and _software engineering agent_.
+
+In this repository, we use _agent_, _AI agent_ or _AI coding agents_ as an umbrella term for Claude Code, Codex, Gemini CLI, Gemini Code Assist, and similar systems.
 
 ## License
 
